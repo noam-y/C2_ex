@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: c2_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: c2_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  c2_server:
+    build: .
+    container_name: c2_core
+    depends_on:
+      - db
+    ports:
+      - "5555:5555"
+    environment:
+      DB_HOST: db
+      DB_NAME: c2_db
+      DB_USER: admin
+      DB_PASS: password123
+
+volumes:
+  postgres_data:

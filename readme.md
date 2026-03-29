@@ -50,3 +50,7 @@ aes_key = HKDF(
     info=b'c2 handshake',
 ).derive(shared_secret)
 '''
+
+## part 3: microservices
+needed fields- timestamp, client_id, command text, result
+choosing relational database since i am more familiar with it + more organised with 2 v different types of logs.

