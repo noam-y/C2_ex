@@ -1,5 +1,6 @@
 import socket
 import threading
+import os
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 class C2Server:

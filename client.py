@@ -1,6 +1,7 @@
 import socket
 import sys
 import time
+import os
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 class Client:
