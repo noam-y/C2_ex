@@ -52,4 +52,5 @@ class Client:
                 break
 
 if __name__ == "__main__":
-    start_client()
+    c = Client()
+    c.start_client()
